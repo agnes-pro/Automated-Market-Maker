@@ -165,3 +165,58 @@
         )
     )
 )
+
+;; Removes liquidity from a pool
+(define-public (remove-liquidity 
+    (token1 <ft-trait>) 
+    (token2 <ft-trait>) 
+    (shares-to-remove uint)
+)
+    (let (
+        (token1-principal (contract-of token1))
+        (token2-principal (contract-of token2))
+    )
+        (asserts! (validate-token-pair token1-principal token2-principal) ERR-INVALID-PAIR)
+        (asserts! (validate-amount shares-to-remove) ERR-INVALID-AMOUNT)
+        
+        (let (
+            (user-position (unwrap! 
+                (map-get? user-liquidity {user: tx-sender, token1: token1-principal, token2: token2-principal})
+                ERR-UNAUTHORIZED
+            ))
+            (pool (unwrap! 
+                (map-get? liquidity-pools {token1: token1-principal, token2: token2-principal})
+                ERR-POOL-NOT-EXISTS
+            ))
+        )
+            (asserts! (<= shares-to-remove (get liquidity-shares user-position)) ERR-INSUFFICIENT-FUNDS)
+            
+            (let (
+                (total-pool-liquidity (get total-liquidity pool))
+                (token1-amount (/ (* shares-to-remove (get token1-reserve pool)) total-pool-liquidity))
+                (token2-amount (/ (* shares-to-remove (get token2-reserve pool)) total-pool-liquidity))
+            )
+                (asserts! (and (validate-amount token1-amount) (validate-amount token2-amount)) ERR-INVALID-AMOUNT)
+                
+                (try! (as-contract (contract-call? token1 transfer token1-amount tx-sender tx-sender none)))
+                (try! (as-contract (contract-call? token2 transfer token2-amount tx-sender tx-sender none)))
+                
+                (map-set liquidity-pools 
+                    {token1: token1-principal, token2: token2-principal}
+                    {
+                        total-liquidity: (- (get total-liquidity pool) shares-to-remove),
+                        token1-reserve: (- (get token1-reserve pool) token1-amount),
+                        token2-reserve: (- (get token2-reserve pool) token2-amount)
+                    }
+                )
+                
+                (map-set user-liquidity 
+                    {user: tx-sender, token1: token1-principal, token2: token2-principal}
+                    {liquidity-shares: (- (get liquidity-shares user-position) shares-to-remove)}
+                )
+                
+                (ok true)
+            )
+        )
+    )
+)
