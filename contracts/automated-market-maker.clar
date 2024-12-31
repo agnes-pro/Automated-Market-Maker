@@ -64,3 +64,53 @@
 ;; Contract variables
 (define-data-var contract-owner principal tx-sender)
 (define-data-var reward-rate uint REWARD-RATE-PER-BLOCK)
+
+;; Governance functions
+
+;; Adds a token to the allowlist
+(define-public (add-allowed-token (token principal))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        (asserts! (not (is-eq token (var-get contract-owner))) ERR-INVALID-TOKEN)
+        (ok (map-set allowed-tokens token true))
+    )
+)
+
+;; Core AMM functions
+
+;; Creates a new liquidity pool for a token pair
+(define-public (create-pool 
+    (token1 <ft-trait>) 
+    (token2 <ft-trait>) 
+    (initial-amount1 uint) 
+    (initial-amount2 uint)
+)
+    (let (
+        (token1-principal (contract-of token1))
+        (token2-principal (contract-of token2))
+    )
+        (asserts! (validate-token-pair token1-principal token2-principal) ERR-INVALID-PAIR)
+        (asserts! (validate-amount initial-amount1) ERR-INVALID-AMOUNT)
+        (asserts! (validate-amount initial-amount2) ERR-INVALID-AMOUNT)
+        (asserts! (is-none (map-get? liquidity-pools {token1: token1-principal, token2: token2-principal})) ERR-POOL-NOT-EXISTS)
+        
+        (try! (contract-call? token1 transfer initial-amount1 tx-sender (as-contract tx-sender) none))
+        (try! (contract-call? token2 transfer initial-amount2 tx-sender (as-contract tx-sender) none))
+        
+        (map-set liquidity-pools 
+            {token1: token1-principal, token2: token2-principal}
+            {
+                total-liquidity: initial-amount1,
+                token1-reserve: initial-amount1,
+                token2-reserve: initial-amount2
+            }
+        )
+        
+        (map-set user-liquidity 
+            {user: tx-sender, token1: token1-principal, token2: token2-principal}
+            {liquidity-shares: initial-amount1}
+        )
+        
+        (ok true)
+    )
+)
