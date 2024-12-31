@@ -220,3 +220,50 @@
         )
     )
 )
+
+;; Swaps tokens using constant product AMM formula
+(define-public (swap-tokens 
+    (token-in <ft-trait>) 
+    (token-out <ft-trait>) 
+    (amount-in uint)
+)
+    (let (
+        (token-in-principal (contract-of token-in))
+        (token-out-principal (contract-of token-out))
+    )
+        (asserts! (validate-token-pair token-in-principal token-out-principal) ERR-INVALID-PAIR)
+        (asserts! (validate-amount amount-in) ERR-INVALID-AMOUNT)
+        
+        (let (
+            (pool (unwrap! 
+                (map-get? liquidity-pools {token1: token-in-principal, token2: token-out-principal})
+                ERR-POOL-NOT-EXISTS
+            ))
+            (constant-product (* (get token1-reserve pool) (get token2-reserve pool)))
+        )
+            (try! (contract-call? token-in transfer amount-in tx-sender (as-contract tx-sender) none))
+            
+            (let (
+                (amount-in-with-fee (* amount-in u997))  ;; 0.3% fee
+                (new-token-in-reserve (+ (get token1-reserve pool) amount-in))
+                (new-token-out-reserve (/ constant-product new-token-in-reserve))
+                (amount-out (- (get token2-reserve pool) new-token-out-reserve))
+            )
+                (asserts! (validate-amount amount-out) ERR-INVALID-AMOUNT)
+                
+                (try! (as-contract (contract-call? token-out transfer amount-out tx-sender tx-sender none)))
+                
+                (map-set liquidity-pools 
+                    {token1: token-in-principal, token2: token-out-principal}
+                    {
+                        total-liquidity: (get total-liquidity pool),
+                        token1-reserve: new-token-in-reserve,
+                        token2-reserve: new-token-out-reserve
+                    }
+                )
+                
+                (ok amount-out)
+            )
+        )
+    )
+)
