@@ -267,3 +267,50 @@
         )
     )
 )
+
+;; Yield farming functions
+
+;; Claims yield farming rewards for provided liquidity
+(define-public (claim-yield-rewards 
+    (token1 <ft-trait>) 
+    (token2 <ft-trait>)
+)
+    (let (
+        (token1-principal (contract-of token1))
+        (token2-principal (contract-of token2))
+    )
+        (asserts! (validate-token-pair token1-principal token2-principal) ERR-INVALID-PAIR)
+        
+        (let (
+            (user-position (unwrap! 
+                (map-get? user-liquidity {user: tx-sender, token1: token1-principal, token2: token2-principal})
+                ERR-UNAUTHORIZED
+            ))
+        )
+            (asserts! (>= (get liquidity-shares user-position) MIN-LIQUIDITY-FOR-REWARDS) ERR-INSUFFICIENT-FUNDS)
+            
+            (let (
+                (reward-amount (* (get liquidity-shares user-position) REWARD-RATE-PER-BLOCK))
+            )
+                (asserts! (validate-amount reward-amount) ERR-INVALID-AMOUNT)
+                
+                (map-set yield-rewards 
+                    {user: tx-sender, token: token1-principal}
+                    {pending-rewards: reward-amount}
+                )
+                
+                (ok reward-amount)
+            )
+        )
+    )
+)
+
+;; Updates the reward rate for yield farming
+(define-public (set-reward-rate (new-rate uint))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        (asserts! (<= new-rate MAX-REWARD-RATE) ERR-INVALID-AMOUNT)
+        (var-set reward-rate new-rate)
+        (ok true)
+    )
+)
