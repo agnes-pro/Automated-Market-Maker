@@ -6,7 +6,7 @@ telemetry = true
 requirements = []
 [contracts.automated-market-maker]
 path = "contracts/automated-market-maker.clar"
-depends_on = []
+depends_on = ["ft-trait"]
 
 [contracts.ft-trait]
 path = "contracts/ft-trait.clar"
