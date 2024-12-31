@@ -314,3 +314,27 @@
         (ok true)
     )
 )
+
+;; Private helper functions
+
+;; Validates if a token is in the allowlist
+(define-private (is-valid-token (token principal))
+    (default-to false (map-get? allowed-tokens token))
+)
+
+;; Validates amount is within acceptable range
+(define-private (validate-amount (amount uint))
+    (and 
+        (> amount u0) 
+        (< amount MAX-UINT)
+    )
+)
+
+;; Validates token pair is valid and allowed
+(define-private (validate-token-pair (token1 principal) (token2 principal))
+    (and 
+        (not (is-eq token1 token2))
+        (is-valid-token token1)
+        (is-valid-token token2)
+	)
+)
