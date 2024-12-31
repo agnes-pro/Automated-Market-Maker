@@ -28,3 +28,30 @@
 (define-constant ERR-ZERO-AMOUNT (err u8))
 (define-constant ERR-MAX-AMOUNT-EXCEEDED (err u9))
 (define-constant ERR-SAME-TOKEN (err u10))
+
+;; Protocol constants
+(define-constant REWARD-RATE-PER-BLOCK u10)
+(define-constant MIN-LIQUIDITY-FOR-REWARDS u100)
+(define-constant MAX-TOKENS-PER-POOL u2)
+(define-constant MAX-REWARD-RATE u1000000)
+(define-constant MAX-UINT u340282366920938463463374607431768211455) ;; 2^128 - 1
+
+;; Data mappings
+(define-map allowed-tokens 
+    principal 
+    bool
+)
+
+(define-map liquidity-pools 
+    {token1: principal, token2: principal} 
+    {
+        total-liquidity: uint,
+        token1-reserve: uint,
+        token2-reserve: uint
+    }
+)
+
+(define-map user-liquidity 
+    {user: principal, token1: principal, token2: principal} 
+    {liquidity-shares: uint}
+)
